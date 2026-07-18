@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SERNAP · Analisis de areas protegidas (limpieza profunda)</title>
+<style>
+  :root{
+    --tinta:#10241f; --papel:#eceadf; --papel2:#e4e1d3; --panel:#f4f2e9;
+    --linea:#c8c4b0; --tenue:#6b6a5c;
+    --musgo:#3f6b4a; --alerta:#a8452e; --oro:#b48a2f; --agua:#2f6f86;
+    --pmi:#2f6f86; --paa:#b48a2f;
+    --menu:220px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--papel);color:var(--tinta);
+       font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+       font-size:13.5px;line-height:1.5;overflow:hidden}
+  h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;margin:0}
+  button{font-family:inherit}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:var(--linea)}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  .app{display:grid;grid-template-columns:var(--menu) 1fr;height:100vh}
+
+  /* ================= MENU LATERAL ================= */
+  aside{background:var(--tinta);color:var(--papel);display:flex;flex-direction:column;
+        overflow:hidden;border-right:1px solid var(--tinta)}
+  .logo{padding:16px 16px 12px;border-bottom:1px solid rgba(236,234,223,.16)}
+  .logo .m{font-size:9px;letter-spacing:.22em;text-transform:uppercase;opacity:.55}
+  .logo h1{font-size:17px;margin-top:3px;color:var(--papel)}
+  .logo .t{font-size:10px;opacity:.5;margin-top:3px}
+
+  .buscar-ap{margin:10px 12px;padding:6px 9px;width:calc(100% - 24px);
+             background:rgba(236,234,223,.09);border:1px solid rgba(236,234,223,.2);
+             color:var(--papel);font-family:inherit;font-size:11.5px}
+  .buscar-ap::placeholder{color:rgba(236,234,223,.4)}
+  .buscar-ap:focus{outline:1px solid var(--musgo);background:rgba(236,234,223,.14)}
+
+  .menu{flex:1;overflow-y:auto;padding-bottom:12px}
+  .ap{display:block;width:100%;text-align:left;background:none;border:0;cursor:pointer;
+      padding:9px 14px;color:rgba(236,234,223,.75);border-left:3px solid transparent}
+  .ap:hover{background:rgba(236,234,223,.06);color:var(--papel)}
+  .ap[aria-current="true"]{background:rgba(236,234,223,.11);color:var(--papel);
+                           border-left-color:var(--musgo)}
+  .ap .n{display:flex;justify-content:space-between;align-items:center;gap:7px;font-size:12.5px}
+  .ap .pt{font-family:Georgia,serif;font-size:11px;flex:none}
+  .ap .d{font-size:9.5px;opacity:.5;margin-top:1px}
+  .ap .bb{display:flex;gap:1px;height:3px;margin-top:5px;background:rgba(236,234,223,.14)}
+  .ap .bb i{display:block;height:100%}
+  .ap:focus-visible{outline:2px solid var(--musgo);outline-offset:-2px}
+
+  /* ================= AREA PRINCIPAL ================= */
+  main{overflow-y:auto;background:var(--papel);position:relative}
+
+  .bienvenida{display:grid;place-items:center;height:100%;text-align:center;padding:30px}
+  .bienvenida h2{font-size:26px;margin-bottom:8px}
+  .bienvenida p{color:var(--tenue);font-size:13px;max-width:430px}
+
+  .cargando{position:absolute;inset:0;display:grid;place-items:center;
+            background:var(--papel);z-index:50;font-size:12px;color:var(--tenue)}
+
+  /* cabecera del area */
+  .cab{padding:20px 26px 0}
+  .cab h2{font-size:27px}
+  .cab .sub{font-size:11px;color:var(--tenue);margin-top:3px;letter-spacing:.05em}
+
+  /* pestanas PMI / PAA */
+  .tabs{display:flex;gap:0;margin:16px 26px 0;border-bottom:1px solid var(--linea)}
+  .tab{padding:11px 20px;border:0;background:none;cursor:pointer;font-size:12.5px;
+       color:var(--tenue);border-bottom:3px solid transparent;letter-spacing:.03em}
+  .tab b{font-family:Georgia,serif;font-size:14px;margin-left:5px}
+  .tab:hover{color:var(--tinta)}
+  .tab[aria-selected="true"]{color:var(--tinta);font-weight:600}
+  .tab.pmi[aria-selected="true"]{border-bottom-color:var(--pmi)}
+  .tab.paa[aria-selected="true"]{border-bottom-color:var(--paa)}
+  .tab:disabled{opacity:.32;cursor:not-allowed}
+  .tab:focus-visible{outline:2px solid var(--musgo);outline-offset:-2px}
+
+  .cuerpo{padding:18px 26px 50px}
+
+  /* tarjetas de resumen del instrumento */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));
+        gap:1px;background:var(--linea);border:1px solid var(--linea);margin-bottom:18px}
+  .k{background:var(--panel);padding:11px 13px}
+  .k .n{font-family:Georgia,serif;font-size:22px;font-weight:600;line-height:1.15}
+  .k .t{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--tenue);margin-top:2px}
+
+  /* rejilla: lista de tablas + detalle */
+  .rej{display:grid;grid-template-columns:300px minmax(0,1fr);gap:18px;align-items:start}
+  @media(max-width:1150px){.rej{grid-template-columns:1fr}}
+
+  .lista{border:1px solid var(--linea);background:var(--panel);
+         max-height:calc(100vh - 260px);overflow-y:auto}
+  .it{padding:9px 12px;border-bottom:1px solid var(--linea);cursor:pointer}
+  .it:last-child{border-bottom:0}
+  .it:hover{background:var(--papel2)}
+  .it[aria-selected="true"]{background:var(--tinta);color:var(--papel)}
+  .it .l1{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:12.5px}
+  .it .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .it .pt{font-family:Georgia,serif;font-weight:600;flex:none;font-size:12px}
+  .it .l2{font-size:10px;color:var(--tenue);margin-top:2px}
+  .it[aria-selected="true"] .l2{color:rgba(236,234,223,.6)}
+  .sem{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;flex:none}
+
+  /* ---------- Detalle de la tabla ---------- */
+  .det{border:2px solid var(--tinta);background:var(--panel);min-width:0}
+  .det-cab{padding:16px 18px;border-bottom:1px solid var(--linea)}
+  .det-cab h3{font-size:19px}
+  .det-cab .frase{font-size:12.5px;color:var(--tinta);margin-top:6px;
+                  padding:9px 12px;background:var(--papel2);border-left:3px solid var(--musgo)}
+  .det-cab .org{font-size:10.5px;color:var(--tenue);margin-top:7px}
+  .det-cab .alerta-f{font-size:10.5px;color:var(--alerta);margin-top:3px}
+
+  .stabs{display:flex;border-bottom:1px solid var(--linea);background:var(--papel2);flex-wrap:wrap}
+  .stab{padding:9px 15px;border:0;background:none;cursor:pointer;font-size:11.5px;
+        color:var(--tenue);border-bottom:2px solid transparent}
+  .stab[aria-selected="true"]{color:var(--tinta);font-weight:600;border-bottom-color:var(--tinta);
+                              background:var(--panel)}
+  .stab:focus-visible{outline:2px solid var(--musgo);outline-offset:-2px}
+
+  .pane{padding:16px 18px}
+
+  /* filtros de tipo de columna */
+  .filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:13px}
+  .fch{padding:5px 10px;font-size:10.5px;cursor:pointer;letter-spacing:.04em;
+       border:1px solid var(--linea);background:var(--papel);color:var(--tenue)}
+  .fch:hover{border-color:var(--tinta);color:var(--tinta)}
+  .fch[aria-pressed="true"]{background:var(--tinta);color:var(--papel);border-color:var(--tinta)}
+  .fch:focus-visible{outline:2px solid var(--musgo);outline-offset:1px}
+
+  /* --- perfil de columnas (tarjetas visuales) --- */
+  .cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:13px}
+  .col{border:1px solid var(--linea);background:var(--papel);padding:11px 12px}
+  .col.vacia{border-style:dashed;opacity:.72}
+  .col .cn{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .col .ct{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+  .col .cr{font-size:10.5px;color:var(--tenue);margin-top:5px}
+  .tp-numerica{color:var(--agua)} .tp-categorica{color:var(--musgo)}
+  .tp-texto{color:var(--oro)} .tp-identificador{color:var(--tenue)}
+  .tp-fecha{color:var(--agua)} .tp-vacia{color:var(--alerta)}
+
+  /* barras de una categorica */
+  .bars{margin-top:9px}
+  .bar{display:grid;grid-template-columns:1fr 34px;gap:7px;align-items:center;
+       font-size:10.5px;padding:1.5px 0}
+  .bar .bv{position:relative;background:var(--papel2);height:15px;overflow:hidden}
+  .bar .bv i{position:absolute;inset:0 auto 0 0;background:var(--musgo);opacity:.3}
+  .bar .bv span{position:relative;padding:0 5px;line-height:15px;display:block;
+                overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bar .bn{text-align:right;color:var(--tenue);font-size:10px}
+
+  /* histograma de una numerica */
+  .hist{display:flex;align-items:flex-end;gap:1.5px;height:52px;margin-top:9px;
+        border-bottom:1px solid var(--linea)}
+  .hist i{flex:1;background:var(--agua);opacity:.55;min-height:1px}
+  .hist i:hover{opacity:.95}
+  .rango{display:flex;justify-content:space-between;font-size:9.5px;color:var(--tenue);margin-top:3px}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:2px 9px;font-size:10.5px;margin-top:7px}
+  .stats b{font-weight:400;color:var(--tenue)}
+
+  /* separador de grupo por Excel de origen */
+  .grp{position:sticky;top:0;z-index:3;display:flex;align-items:baseline;gap:7px;
+       padding:8px 12px 6px;background:var(--tinta);color:var(--papel);
+       border-top:1px solid rgba(236,234,223,.12)}
+  .grp:first-child{border-top:none}
+  .grp-n{font-family:Georgia,serif;font-weight:700;font-size:11px;flex:none;
+         letter-spacing:.02em;white-space:nowrap}
+  .grp-f{font-size:10px;opacity:.7;overflow:hidden;text-overflow:ellipsis;
+         white-space:nowrap;flex:1;font-style:italic}
+  .grp-c{font-size:9.5px;opacity:.5;flex:none;white-space:nowrap}
+  .tnum{font-family:Georgia,serif;font-weight:700;color:var(--musgo);
+        font-size:10.5px;margin-right:2px}
+
+  /* badge de anomalias / fecha_dt */
+  .badge-anom{display:inline-block;padding:1px 6px;font-size:9.5px;font-weight:600;
+              background:var(--alerta);color:#fff;margin-left:6px;border-radius:2px}
+  .badge-fecha{display:inline-block;padding:1px 6px;font-size:9.5px;font-weight:600;
+               background:var(--agua);color:#fff;margin-left:6px;border-radius:2px}
+  .obs-anom{padding:7px 9px;background:rgba(168,69,46,.08);border-left:2px solid var(--alerta);
+            font-size:10.5px;margin-top:5px}
+
+  /* barra de nulos */
+  .nulos{margin-top:9px;font-size:10px;color:var(--tenue)}
+  .nb{height:4px;background:var(--linea);margin-top:3px}
+  .nb i{display:block;height:100%;background:var(--alerta)}
+
+  /* variantes de escritura */
+  .var{margin-top:8px;padding:7px 8px;background:rgba(168,69,46,.07);
+       border-left:2px solid var(--alerta);font-size:10px}
+  .var .vt{color:var(--alerta);font-weight:600;margin-bottom:2px}
+  .var code{background:var(--papel2);padding:0 3px;font-size:10px}
+
+  .ejs{margin-top:8px;font-size:10px;color:var(--tenue);line-height:1.6}
+  .ejs code{background:var(--papel2);padding:1px 4px;display:block;margin-top:2px;
+            overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* --- calidad --- */
+  .chks{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:13px;margin-bottom:16px}
+  .chk .e{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.06em;
+          text-transform:uppercase;color:var(--tenue);margin-bottom:4px}
+  .chk .e b{color:var(--tinta);font-family:Georgia,serif;font-size:12.5px;letter-spacing:0}
+  .chk .b{height:5px;background:var(--linea)}
+  .chk .b i{display:block;height:100%}
+  .acc{display:flex;gap:9px;font-size:12px;padding:5px 0;color:var(--alerta);
+       border-bottom:1px solid var(--linea)}
+  .acc:last-child{border-bottom:0}
+  .acc::before{content:"→";flex:none;font-weight:700}
+  .acc.ok{color:var(--musgo)}.acc.ok::before{content:"✓"}
+
+  /* --- datos reales --- */
+  .herr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:11px}
+  .herr input{flex:1;min-width:150px;padding:6px 9px;font-family:inherit;font-size:12px;
+              border:1px solid var(--linea);background:var(--papel);color:var(--tinta)}
+  .herr input:focus{outline:2px solid var(--musgo);outline-offset:1px}
+  .herr button{padding:6px 11px;font-size:11px;cursor:pointer;
+               border:1px solid var(--tinta);background:var(--papel);color:var(--tinta)}
+  .herr button:hover{background:var(--tinta);color:var(--papel)}
+  .herr .i{font-size:10.5px;color:var(--tenue)}
+  .tabla{overflow:auto;max-height:58vh;border:1px solid var(--linea)}
+  table{width:100%;border-collapse:collapse;font-size:11.5px}
+  th,td{padding:5px 9px;text-align:left;border-bottom:1px solid var(--linea);
+        white-space:nowrap;max-width:250px;overflow:hidden;text-overflow:ellipsis}
+  thead th{position:sticky;top:0;background:var(--papel2);cursor:pointer;z-index:2;
+           font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--tenue);
+           font-weight:400;border-bottom:2px solid var(--tinta)}
+  thead th:hover{color:var(--tinta)}
+  thead th.an{color:var(--alerta);opacity:.7}
+  tbody tr:nth-child(even){background:rgba(0,0,0,.016)}
+  tbody tr:hover{background:var(--papel2)}
+  td.nul{color:var(--alerta);opacity:.45;font-style:italic}
+  .nf{color:var(--tenue);font-size:10px;width:40px;text-align:right}
+  .pie{font-size:10.5px;color:var(--tenue);margin-top:8px}
+
+  .vac{padding:38px 18px;text-align:center;color:var(--tenue);font-size:12px}
+
+  @media(max-width:800px){
+    body{overflow:auto}
+    .app{grid-template-columns:1fr;height:auto}
+    aside{height:auto;max-height:46vh}
+    .lista{max-height:none}
+    .cab,.tabs,.cuerpo{padding-left:14px;padding-right:14px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ MENU DE AREAS PROTEGIDAS ============ -->
+  <aside>
+    <div class="logo">
+      <div class="m">SERNAP · Bolivia</div>
+      <h1>Areas protegidas</h1>
+      <div class="t2" style="font-size:9px;opacity:.45;margin-top:1px">pipeline de limpieza profunda</div>
+      <div class="t" id="tGlobal"></div>
+    </div>
+    <input class="buscar-ap" id="bAP" placeholder="Buscar area..." aria-label="Buscar area protegida">
+    <nav class="menu" id="menu" aria-label="Areas protegidas"></nav>
+  </aside>
+
+  <!-- ============ PANEL PRINCIPAL ============ -->
+  <main id="main">
+    <div class="bienvenida">
+      <div>
+        <h2>Elige un area protegida</h2>
+        <p>Cada area se analiza por separado. Dentro veras sus dos instrumentos
+           (PMI y PAA) y, para cada tabla, que tipo de informacion contiene.</p>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script>
+/* Resumen de las 21 areas: se incrusta aqui (es liviano).
+   Los DATOS de cada area se cargan aparte, solo al hacer clic. */
+const INDICE = [{"area": "MADIDI", "archivo": "AP_MADIDI.js", "total_filas": 107074, "total_tablas": 85, "total_anomalias": 391, "calidad": 89.2, "criticas": 0, "PMI": {"tablas": 68, "filas": 106069}, "PAA": {"tablas": 17, "filas": 1005}}, {"area": "PALMAR", "archivo": "AP_PALMAR.js", "total_filas": 17187, "total_tablas": 78, "total_anomalias": 243, "calidad": 88.4, "criticas": 1, "PMI": {"tablas": 69, "filas": 16673}, "PAA": {"tablas": 9, "filas": 514}}, {"area": "PILON LAJAS", "archivo": "AP_PILON_LAJAS.js", "total_filas": 13144, "total_tablas": 40, "total_anomalias": 64, "calidad": 91.2, "criticas": 0, "PMI": {"tablas": 33, "filas": 12749}, "PAA": {"tablas": 7, "filas": 395}}, {"area": "CARRASCO", "archivo": "AP_CARRASCO.js", "total_filas": 11602, "total_tablas": 35, "total_anomalias": 16, "calidad": 93.3, "criticas": 0, "PMI": {"tablas": 26, "filas": 11024}, "PAA": {"tablas": 9, "filas": 578}}, {"area": "TARIQUIA", "archivo": "AP_TARIQUIA.js", "total_filas": 9402, "total_tablas": 58, "total_anomalias": 249, "calidad": 92.2, "criticas": 0, "PMI": {"tablas": 56, "filas": 9288}, "PAA": {"tablas": 2, "filas": 114}}, {"area": "COTAPATA", "archivo": "AP_COTAPATA.js", "total_filas": 8879, "total_tablas": 45, "total_anomalias": 75, "calidad": 89.3, "criticas": 0, "PMI": {"tablas": 35, "filas": 8168}, "PAA": {"tablas": 10, "filas": 711}}, {"area": "TOROTORO", "archivo": "AP_TOROTORO.js", "total_filas": 5878, "total_tablas": 78, "total_anomalias": 89, "calidad": 92.4, "criticas": 0, "PMI": {"tablas": 78, "filas": 5878}, "PAA": {"tablas": 0, "filas": 0}}, {"area": "AGUARAGUE", "archivo": "AP_AGUARAGUE.js", "total_filas": 5695, "total_tablas": 43, "total_anomalias": 201, "calidad": 90.9, "criticas": 0, "PMI": {"tablas": 34, "filas": 4879}, "PAA": {"tablas": 9, "filas": 816}}, {"area": "MANURIPI", "archivo": "AP_MANURIPI.js", "total_filas": 4124, "total_tablas": 13, "total_anomalias": 0, "calidad": 97.1, "criticas": 0, "PMI": {"tablas": 13, "filas": 4124}, "PAA": {"tablas": 0, "filas": 0}}, {"area": "SAMA", "archivo": "AP_SAMA.js", "total_filas": 4088, "total_tablas": 90, "total_anomalias": 45, "calidad": 90.5, "criticas": 0, "PMI": {"tablas": 63, "filas": 3641}, "PAA": {"tablas": 27, "filas": 447}}, {"area": "SAJAMA", "archivo": "AP_SAJAMA.js", "total_filas": 3474, "total_tablas": 31, "total_anomalias": 36, "calidad": 92.3, "criticas": 0, "PMI": {"tablas": 26, "filas": 3121}, "PAA": {"tablas": 5, "filas": 353}}, {"area": "TUNARI", "archivo": "AP_TUNARI.js", "total_filas": 2747, "total_tablas": 47, "total_anomalias": 30, "calidad": 89.2, "criticas": 0, "PMI": {"tablas": 40, "filas": 2334}, "PAA": {"tablas": 7, "filas": 413}}, {"area": "OTUQUIS", "archivo": "AP_OTUQUIS.js", "total_filas": 2417, "total_tablas": 29, "total_anomalias": 29, "calidad": 90.7, "criticas": 0, "PMI": {"tablas": 27, "filas": 2331}, "PAA": {"tablas": 2, "filas": 86}}, {"area": "AMBORO", "archivo": "AP_AMBORO.js", "total_filas": 2285, "total_tablas": 54, "total_anomalias": 26, "calidad": 93.3, "criticas": 0, "PMI": {"tablas": 51, "filas": 2175}, "PAA": {"tablas": 3, "filas": 110}}, {"area": "REA", "archivo": "AP_REA.js", "total_filas": 1419, "total_tablas": 33, "total_anomalias": 22, "calidad": 89.8, "criticas": 0, "PMI": {"tablas": 12, "filas": 330}, "PAA": {"tablas": 21, "filas": 1089}}, {"area": "SAN MATIAS", "archivo": "AP_SAN_MATIAS.js", "total_filas": 1195, "total_tablas": 38, "total_anomalias": 46, "calidad": 92.6, "criticas": 0, "PMI": {"tablas": 36, "filas": 1098}, "PAA": {"tablas": 2, "filas": 97}}, {"area": "NOEL KEMPF", "archivo": "AP_NOEL_KEMPF.js", "total_filas": 1184, "total_tablas": 23, "total_anomalias": 4, "calidad": 92.4, "criticas": 0, "PMI": {"tablas": 23, "filas": 1184}, "PAA": {"tablas": 0, "filas": 0}}, {"area": "TIPNIS", "archivo": "AP_TIPNIS.js", "total_filas": 703, "total_tablas": 28, "total_anomalias": 13, "calidad": 92.6, "criticas": 0, "PMI": {"tablas": 24, "filas": 90}, "PAA": {"tablas": 4, "filas": 613}}, {"area": "APOLOBAMBA", "archivo": "AP_APOLOBAMBA.js", "total_filas": 678, "total_tablas": 11, "total_anomalias": 19, "calidad": 94.4, "criticas": 0, "PMI": {"tablas": 3, "filas": 390}, "PAA": {"tablas": 8, "filas": 288}}, {"area": "INAO", "archivo": "AP_INAO.js", "total_filas": 674, "total_tablas": 17, "total_anomalias": 7, "calidad": 89.9, "criticas": 0, "PMI": {"tablas": 17, "filas": 674}, "PAA": {"tablas": 0, "filas": 0}}, {"area": "CARDON", "archivo": "AP_CARDON.js", "total_filas": 195, "total_tablas": 21, "total_anomalias": 4, "calidad": 96.7, "criticas": 0, "PMI": {"tablas": 1, "filas": 6}, "PAA": {"tablas": 20, "filas": 189}}, {"area": "KAA IYA", "archivo": "AP_KAA_IYA.js", "total_filas": 181, "total_tablas": 5, "total_anomalias": 12, "calidad": 84.8, "criticas": 0, "PMI": {"tablas": 1, "filas": 24}, "PAA": {"tablas": 4, "filas": 157}}, {"area": "EBB", "archivo": "AP_EBB.js", "total_filas": 120, "total_tablas": 6, "total_anomalias": 0, "calidad": 84.8, "criticas": 0, "PMI": {"tablas": 3, "filas": 60}, "PAA": {"tablas": 3, "filas": 60}}];
+
+const COL = {PMI:"#2f6f86", PAA:"#b48a2f"};
+const cache = {};              // areas ya cargadas
+let AP = null;                 // area activa (paquete completo)
+let instr = "PMI";             // pestana activa
+let sel = null;                // tabla activa
+let vista = "perfil";          // perfil | calidad | datos
+let orden = {c:null, asc:true};
+let filtro = "";
+
+const fmt = n => (n ?? 0).toLocaleString("es-BO");
+const color = p => p>=80 ? "#3f6b4a" : (p>=50 ? "#b48a2f" : "#a8452e");
+const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+/* ================= MENU ================= */
+function pintarMenu(){
+  const q = document.getElementById("bAP").value.trim().toLowerCase();
+  const lista = INDICE.filter(a => !q || a.area.toLowerCase().includes(q));
+
+  document.getElementById("tGlobal").textContent =
+    `${INDICE.length} areas · ${fmt(INDICE.reduce((s,a)=>s+a.total_filas,0))} registros`;
+
+  document.getElementById("menu").innerHTML = lista.map(a=>{
+    const tot = Math.max(a.PMI.filas + a.PAA.filas, 1);
+    return `
+    <button class="ap" data-a="${esc(a.area)}" aria-current="${AP && AP.area===a.area}">
+      <div class="n">
+        <span class="nm">${esc(a.area)}</span>
+        <span class="pt" style="color:${color(a.calidad)}">${a.calidad}</span>
+      </div>
+      <div class="d">${fmt(a.total_filas)} reg · ${a.total_tablas} tablas</div>
+      <div class="bb">
+        <i style="width:${100*a.PMI.filas/tot}%;background:${COL.PMI}"></i>
+        <i style="width:${100*a.PAA.filas/tot}%;background:${COL.PAA}"></i>
+      </div>
+    </button>`;
+  }).join("");
+
+  document.querySelectorAll(".ap").forEach(b=>{
+    b.onclick = () => abrirArea(b.dataset.a);
+  });
+}
+
+/* ================= CARGA DIFERIDA DE UN AREA ================= */
+/* Se usa <script> y no fetch(): fetch esta bloqueado por CORS cuando la
+   pagina se abre con doble clic (file://). Asi funciona sin servidor. */
+function abrirArea(nombre){
+  if(cache[nombre]){ montar(cache[nombre]); return; }
+
+  document.getElementById("main").innerHTML =
+    `<div class="cargando">Cargando ${esc(nombre)}...</div>`;
+
+  const meta = INDICE.find(a => a.area === nombre);
+  const s = document.createElement("script");
+  s.src = "datos/" + meta.archivo;
+  s.onerror = () => {
+    document.getElementById("main").innerHTML =
+      `<div class="vac">No se encontro el archivo <code>datos/${esc(meta.archivo)}</code>.
+       Verifica que la carpeta <b>datos/</b> este junto a app.html.</div>`;
+  };
+  document.head.appendChild(s);
+}
+
+/* La llama cada archivo datos/AP_*.js al terminar de cargar */
+window.RECIBIR = function(paquete){
+  cache[paquete.area] = paquete;
+  montar(paquete);
+};
+
+function montar(paquete){
+  AP = paquete;
+  sel = null; vista = "perfil"; filtro = ""; orden = {c:null, asc:true};
+  // arranca en el instrumento que SI tenga tablas
+  instr = AP.PMI.tablas ? "PMI" : "PAA";
+  pintarMenu();
+  pintarArea();
+  document.getElementById("main").scrollTop = 0;
+}
+
+/* ================= AREA ================= */
+function tablas(){
+  return AP ? AP.tablas.filter(t => t.instrumento === instr) : [];
+}
+
+function pintarArea(){
+  const r = AP[instr];
+  document.getElementById("main").innerHTML = `
+    <div class="cab">
+      <h2>${esc(AP.area)}</h2>
+      <div class="sub">${fmt(AP.total_filas)} registros · ${AP.total_tablas} tablas ·
+        ${AP.total_anomalias>0?fmt(AP.total_anomalias)+" filas para revisar · ":""}calidad global
+        <b style="color:${color(AP.calidad)}">${AP.calidad}</b>/100</div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab pmi" data-i="PMI" role="tab"
+        aria-selected="${instr==="PMI"}" ${AP.PMI.tablas?"":"disabled"}>
+        PMI · Monitoreo Integral <b>${AP.PMI.tablas}</b></button>
+      <button class="tab paa" data-i="PAA" role="tab"
+        aria-selected="${instr==="PAA"}" ${AP.PAA.tablas?"":"disabled"}>
+        PAA · Accion Ambiental <b>${AP.PAA.tablas}</b></button>
+    </div>
+
+    <div class="cuerpo">
+      ${r.tablas ? `
+      <div class="kpis">
+        <div class="k"><div class="n" style="color:${COL[instr]}">${instr}</div>
+          <div class="t">Instrumento</div></div>
+        <div class="k"><div class="n">${fmt(r.filas)}</div><div class="t">Registros</div></div>
+        <div class="k"><div class="n">${r.tablas}</div><div class="t">Tablas</div></div>
+        <div class="k"><div class="n">${fmt(r.columnas)}</div><div class="t">Columnas</div></div>
+        <div class="k"><div class="n" style="color:${color(r.calidad)}">${r.calidad}</div>
+          <div class="t">Calidad /100</div></div>
+        <div class="k"><div class="n" style="color:${r.criticas?"#a8452e":"#3f6b4a"}">${r.criticas}</div>
+          <div class="t">Por revisar</div></div>
+        <div class="k"><div class="n" style="color:${r.anomalias?"#a8452e":"#3f6b4a"}">${fmt(r.anomalias)}</div>
+          <div class="t">Filas para revisar</div></div>
+        <div class="k"><div class="n">${r.con_fecha}</div><div class="t">Tablas con fecha_dt</div></div>
+      </div>
+
+      <div class="rej">
+        <div class="lista" id="lista"></div>
+        <div class="det" id="det"></div>
+      </div>` : `
+      <div class="vac">Esta area no tiene tablas de <b>${instr}</b>.</div>`}
+    </div>`;
+
+  document.querySelectorAll(".tab").forEach(b=>{
+    b.onclick = () => { if(b.disabled) return;
+      instr = b.dataset.i; sel=null; vista="perfil"; filtro=""; pintarArea(); };
+  });
+
+  if(r.tablas){ pintarLista(); pintarDetalle(); }
+}
+
+function pintarLista(){
+  const t = tablas();
+  const c = document.getElementById("lista");
+  // ¿este instrumento tiene mas de un Excel? -> se muestran separadores
+  const nExcels = new Set(t.map(x=>x.excel_num)).size;
+
+  let html = "", excelPrev = null;
+  t.forEach((x,i)=>{
+    if(x.excel_num !== excelPrev){
+      excelPrev = x.excel_num;
+      const nTablas = t.filter(y=>y.excel_num===x.excel_num).length;
+      html += `<div class="grp">
+        <span class="grp-n">Archivo ${x.excel_num}</span>
+        <span class="grp-f" title="${esc(x.excel)}">${esc(x.excel)}</span>
+        <span class="grp-c">${nTablas} ${nTablas===1?"tabla":"tablas"}</span>
+      </div>`;
+    }
+    html += `
+    <div class="it" data-i="${i}" role="button" tabindex="0" aria-selected="${i===sel}">
+      <div class="l1">
+        <span class="nm"><span class="sem" style="background:${color(x.puntaje)}"></span>
+          ${nExcels>1?`<span class="tnum">${x.excel_num}.${x.num}</span> `:""}${esc(x.hoja)}</span>
+        <span class="pt" style="color:${i===sel?"inherit":color(x.puntaje)}">${x.puntaje}</span>
+      </div>
+      <div class="l2">${fmt(x.filas)} filas · ${x.n_columnas} col
+        ${x.anomalias>0?`<span class="badge-anom">${fmt(x.anomalias)} rev.</span>`:""}
+        ${x.tiene_fecha_dt?`<span class="badge-fecha">fecha_dt</span>`:""}
+      </div>
+    </div>`;
+  });
+  c.innerHTML = html;
+
+  c.querySelectorAll(".it").forEach(el=>{
+    const ir = ()=>{ sel=+el.dataset.i; vista="perfil"; filtro=""; fTipo="utiles";
+                     orden={c:null,asc:true}; pintarLista(); pintarDetalle(); };
+    el.onclick = ir;
+    el.onkeydown = e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); ir(); } };
+  });
+}
+
+/* ================= DETALLE DE UNA TABLA ================= */
+function pintarDetalle(){
+  const t = tablas();
+  const c = document.getElementById("det");
+
+  if(sel === null || !t[sel]){
+    c.innerHTML = `<div class="vac">Elige una tabla para ver <b>que informacion contiene</b>,
+      su calidad y sus datos reales.</div>`;
+    return;
+  }
+
+  const x = t[sel];
+  c.innerHTML = `
+    <div class="det-cab">
+      <h3>${esc(x.hoja)}</h3>
+      <div class="frase">${esc(x.resumen.texto)}</div>
+      <div class="org">Origen: ${esc(x.ruta_origen)}</div>
+      ${x.fantasma ? `<div class="alerta-f">Se descartaron ${fmt(x.fantasma)} columnas
+         vacias de Excel (ruido, sin datos reales)</div>` : ""}
+    </div>
+    <div class="stabs">
+      <button class="stab" data-v="perfil"  aria-selected="${vista==="perfil"}">Que contiene (${x.n_columnas} columnas)</button>
+      <button class="stab" data-v="calidad" aria-selected="${vista==="calidad"}">Calidad · ${x.puntaje}/100</button>
+      ${x.anomalias>0?`<button class="stab" data-v="anomalias" aria-selected="${vista==="anomalias"}">Para revisar (${fmt(x.anomalias)})</button>`:""}
+      <button class="stab" data-v="datos"   aria-selected="${vista==="datos"}">Datos reales (${fmt(x.filas)})</button>
+    </div>
+    <div class="pane" id="pane"></div>`;
+
+  c.querySelectorAll(".stab").forEach(b=>{
+    b.onclick = ()=>{ vista=b.dataset.v; pintarDetalle(); };
+  });
+
+  if(vista==="perfil")    perfil(x);
+  if(vista==="calidad")   calidad(x);
+  if(vista==="anomalias") anomalias(x);
+  if(vista==="datos")     datos(x);
+}
+
+/* --------- VISTA 1: QUE CONTIENE CADA COLUMNA --------- */
+let fTipo = "utiles";   // filtro de la vista perfil
+
+function perfil(x){
+  const ps = x.perfiles;
+  if(!ps.length){ document.getElementById("pane").innerHTML =
+    '<p class="vac">Tabla sin columnas.</p>'; return; }
+
+  const anon = ps.filter(p=>p.anonima).length;
+  const cuenta = {};
+  ps.forEach(p => { if(!p.anonima) cuenta[p.tipo] = (cuenta[p.tipo]||0)+1; });
+
+  let lista;
+  if(fTipo === "utiles")      lista = ps.filter(p=>!p.anonima);
+  else if(fTipo === "todas")  lista = ps;
+  else                        lista = ps.filter(p=>!p.anonima && p.tipo===fTipo);
+
+  const chip = (v,t,n) =>
+    `<button class="fch" data-f="${v}" aria-pressed="${fTipo===v}">${t}${n!==undefined?` ${n}`:""}</button>`;
+
+  document.getElementById("pane").innerHTML = `
+    <div class="filtros">
+      ${chip("utiles","Con nombre", ps.length-anon)}
+      ${Object.entries(cuenta).sort((a,b)=>b[1]-a[1]).map(([t,n])=>chip(t,t,n)).join("")}
+      ${anon ? chip("todas","Incluir sin nombre", ps.length) : ""}
+    </div>
+    <div class="cols">${lista.length
+      ? lista.map(tarjeta).join("")
+      : '<p class="vac">No hay columnas de este tipo.</p>'}</div>`;
+
+  document.querySelectorAll(".fch").forEach(b=>{
+    b.onclick = ()=>{ fTipo = b.dataset.f; perfil(x); };
+  });
+}
+
+function tarjeta(p){
+  const nulos = p.pct_nulo > 0 ? `
+    <div class="nulos">${fmt(p.nulos)} celdas vacias · ${p.pct_nulo}%
+      <div class="nb"><i style="width:${p.pct_nulo}%"></i></div>
+    </div>` : "";
+
+  let cuerpo = "";
+
+  if(p.tipo === "categorica"){
+    const max = Math.max(...p.valores.map(v=>v.n), 1);
+    cuerpo = `<div class="bars">${p.valores.map(v=>`
+      <div class="bar">
+        <div class="bv" title="${esc(v.v)}">
+          <i style="width:${100*v.n/max}%"></i><span>${esc(v.v)}</span>
+        </div>
+        <div class="bn">${fmt(v.n)}</div>
+      </div>`).join("")}
+      ${p.otros>0 ? `<div class="bar"><div class="bv"><span style="color:var(--tenue)">
+        otros valores</span></div><div class="bn">${fmt(p.otros)}</div></div>` : ""}
+    </div>`;
+
+    if(p.variantes && p.variantes.length){
+      cuerpo += p.variantes.map(v=>`
+        <div class="var">
+          <div class="vt">Mismo valor escrito de ${v.escrituras.length} formas</div>
+          ${v.escrituras.map(e=>`<code>${esc(e)}</code>`).join(" ")}
+        </div>`).join("");
+    }
+  }
+
+  else if(p.tipo === "numerica"){
+    const max = Math.max(...(p.histograma||[]).map(h=>h.n), 1);
+    cuerpo = `
+      ${p.histograma && p.histograma.length ? `
+      <div class="hist">${p.histograma.map(h=>`
+        <i style="height:${100*h.n/max}%"
+           title="${h.desde} a ${h.hasta}: ${fmt(h.n)} registros"></i>`).join("")}</div>
+      <div class="rango"><span>${fmt(p.min)}</span><span>${fmt(p.max)}</span></div>` : ""}
+      <div class="stats">
+        <span><b>promedio</b> ${fmt(p.promedio)}</span>
+        <span><b>mediana</b> ${fmt(p.mediana)}</span>
+        <span><b>minimo</b> ${fmt(p.min)}</span>
+        <span><b>maximo</b> ${fmt(p.max)}</span>
+        ${p.ceros ? `<span><b>ceros</b> ${fmt(p.ceros)}</span>` : ""}
+        ${p.negativos ? `<span style="color:var(--alerta)"><b>negativos</b> ${fmt(p.negativos)}</span>` : ""}
+      </div>`;
+  }
+
+  else if(p.tipo === "fecha"){
+    const max = Math.max(...p.linea.map(l=>l[1]), 1);
+    cuerpo = `<div class="hist">${p.linea.map(l=>`
+      <i style="height:${100*l[1]/max}%" title="${esc(l[0])}: ${fmt(l[1])}"></i>`).join("")}</div>
+      <div class="rango"><span>${esc(p.linea[0][0])}</span>
+        <span>${esc(p.linea[p.linea.length-1][0])}</span></div>`;
+  }
+
+  else if(p.tipo === "texto" || p.tipo === "identificador"){
+    cuerpo = `<div class="ejs">Ejemplos reales:
+      ${(p.ejemplos||[]).map(e=>`<code>${esc(e)}</code>`).join("")}</div>`;
+  }
+
+  return `
+    <div class="col ${p.tipo==="vacia"?"vacia":""}">
+      <div class="cn" title="${esc(p.columna)}">${esc(p.columna)}</div>
+      <div class="ct tp-${p.tipo}">${p.tipo}${p.anonima?" · sin nombre":""}</div>
+      <div class="cr">${esc(p.resumen)}</div>
+      ${cuerpo}
+      ${nulos}
+    </div>`;
+}
+
+/* --------- VISTA 2: CALIDAD --------- */
+const NOM = {completitud:"Completitud", columnas:"Columnas con nombre",
+             duplicados:"Filas unicas", coordenadas:"Coordenadas validas",
+             fechas:"Anios validos"};
+
+function calidad(x){
+  const ok = x.acciones.length===1 && x.acciones[0].startsWith("Sin acciones");
+  document.getElementById("pane").innerHTML = `
+    <div class="chks">${Object.entries(x.detalle).map(([k,v])=>`
+      <div class="chk"><div class="e"><span>${NOM[k]||k}</span><b>${v}%</b></div>
+        <div class="b"><i style="width:${v}%;background:${color(v)}"></i></div></div>`).join("")}
+    </div>
+    <h3 style="font-size:14px;margin-bottom:6px">Que hay que revisar o mejorar</h3>
+    ${x.acciones.map(a=>`<div class="acc ${ok?"ok":""}">${esc(a)}</div>`).join("")}`;
+}
+
+/* --------- VISTA: PARA REVISAR (flag_anomalia) --------- */
+function anomalias(x){
+  const iFlag = x.datos.columnas.length - 2;   // flag_anomalia = penultima
+  const iObs  = x.datos.columnas.length - 1;   // observacion_error = ultima
+  const filas = x.datos.filas
+    .map((f,i)=>({f,i}))
+    .filter(({f})=> f[iFlag] === true || f[iFlag] === "true");
+
+  document.getElementById("pane").innerHTML = `
+    <div class="var" style="margin-top:0">
+      <div class="vt">${fmt(x.anomalias)} fila(s) marcadas para revision manual (${x.pct_anomalias}%)</div>
+      No se eliminaron: el pipeline las reparo de forma segura (fusionando datos que
+      excedian el ancho esperado en la ultima columna) y las dejo senaladas aqui.
+    </div>
+    ${(x.ejemplos_anomalia||[]).map(o=>`<div class="obs-anom">${esc(o)}</div>`).join("")}
+    <div class="tabla" style="margin-top:12px">
+      <table>
+        <thead><tr><th class="nf">#</th>${x.datos.columnas.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead>
+        <tbody>${filas.slice(0,300).map(({f,i})=>`<tr>
+          <td class="nf">${i+1}</td>
+          ${f.map((v,j)=> v===null ? '<td class="nul">vacio</td>'
+                        : `<td title="${esc(v)}" style="${j===iObs?'color:var(--alerta)':''}">${esc(v)}</td>`).join("")}
+        </tr>`).join("")}</tbody>
+      </table>
+    </div>
+    <div class="pie">${filas.length>300?`Mostrando 300 de ${fmt(filas.length)}.`:`${fmt(filas.length)} fila(s).`}</div>`;
+}
+
+/* --------- VISTA 3: DATOS REALES --------- */
+function datos(x){
+  const d = x.datos;
+  const pane = document.getElementById("pane");
+  if(!d.columnas.length || !d.filas.length){
+    pane.innerHTML = '<p class="vac">Esta tabla no tiene filas.</p>'; return;
+  }
+
+  let filas = d.filas;
+  if(filtro){
+    const q = filtro.toLowerCase();
+    filas = filas.filter(f => f.some(v => v!==null && String(v).toLowerCase().includes(q)));
+  }
+  if(orden.c !== null){
+    const i = orden.c, s = orden.asc ? 1 : -1;
+    filas = [...filas].sort((a,b)=>{
+      const va=a[i], vb=b[i];
+      if(va===null && vb===null) return 0;
+      if(va===null) return 1;
+      if(vb===null) return -1;
+      const na=parseFloat(va), nb=parseFloat(vb);
+      if(!isNaN(na) && !isNaN(nb)) return (na-nb)*s;
+      return String(va).localeCompare(String(vb),"es")*s;
+    });
+  }
+
+  pane.innerHTML = `
+    <div class="herr">
+      <input id="bd" placeholder="Buscar en los datos..." value="${esc(filtro)}"
+             aria-label="Buscar en los datos">
+      <button id="csv">Descargar CSV</button>
+      <span class="i">${fmt(filas.length)} de ${fmt(d.filas.length)} filas</span>
+    </div>
+    <div class="tabla">
+      <table>
+        <thead><tr><th class="nf">#</th>${d.columnas.map((c,i)=>{
+          const an = c.startsWith("unnamed_")||c.startsWith("columna_sin_nombre");
+          const fl = orden.c===i ? (orden.asc?"▲":"▼") : "↕";
+          return `<th data-c="${i}" class="${an?"an":""}" title="${esc(c)}">${esc(c)} ${fl}</th>`;
+        }).join("")}</tr></thead>
+        <tbody>${filas.map((f,n)=>`<tr><td class="nf">${n+1}</td>${
+          f.map(v=> v===null ? '<td class="nul">vacio</td>'
+                             : `<td title="${esc(v)}">${esc(v)}</td>`).join("")
+        }</tr>`).join("")}</tbody>
+      </table>
+    </div>
+    <div class="pie">${d.recortada
+      ? `Primeras ${fmt(d.filas.length)} de ${fmt(d.total)} filas.`
+      : `Todas las filas (${fmt(d.total)}).`} Clic en una cabecera para ordenar.</div>`;
+
+  const inp = document.getElementById("bd");
+  inp.oninput = e => { filtro = e.target.value; datos(x);
+    const n = document.getElementById("bd"); n.focus();
+    n.setSelectionRange(n.value.length, n.value.length); };
+  pane.querySelectorAll("thead th[data-c]").forEach(th=>{
+    th.onclick = () => { const i=+th.dataset.c;
+      orden = orden.c===i ? {c:i, asc:!orden.asc} : {c:i, asc:true}; datos(x); };
+  });
+  document.getElementById("csv").onclick = () => csv(x, filas);
+}
+
+function csv(x, filas){
+  const cel = v => { const s=String(v ?? "");
+    return /[",\n;]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const L = [["#", ...x.datos.columnas].map(cel).join(",")];
+  filas.forEach((f,i)=> L.push([i+1, ...f.map(v=> v===null?"":v)].map(cel).join(",")));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff"+L.join("\n")], {type:"text/csv;charset=utf-8"}));
+  a.download = `${AP.area}_${x.instrumento}_${x.hoja}.csv`.replace(/[^\w.\-]+/g,"_");
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ================= ARRANQUE ================= */
+document.getElementById("bAP").oninput = pintarMenu;
+pintarMenu();
+</script>
+</body>
+</html>
